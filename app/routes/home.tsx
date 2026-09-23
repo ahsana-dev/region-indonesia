@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { Route } from "./+types/home";
 import { CodeBlock } from "../docs/code-block";
@@ -21,7 +21,8 @@ export async function loader() {
   return getStats();
 }
 
-const PLACEHOLDER_ORIGIN = "https://your-site.pages.dev";
+const ORIGINS = ["https://region.ahsana.id", "https://region-indonesia.pages.dev"];
+const origin = ORIGINS[0];
 const REPO_URL = "https://github.com/ahsana-dev/region-indonesia";
 
 const ENDPOINTS = [
@@ -96,10 +97,6 @@ function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { provinces, regencies, districts, villages, generated } = loaderData;
 
-  // Examples show the real domain once running in the browser.
-  const [origin, setOrigin] = useState(PLACEHOLDER_ORIGIN);
-  useEffect(() => setOrigin(location.origin), []);
-
   const stats = [
     { value: provinces, label: "provinces" },
     { value: regencies, label: "regencies / cities" },
@@ -146,8 +143,19 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
       <Section id="endpoints" title="Endpoints">
         <p className="mb-3">
           All endpoints are <InlineCode>GET</InlineCode> requests for static files under{" "}
-          <InlineCode>{origin}/api/</InlineCode>.
+          <InlineCode>{ORIGINS[0]}/api/</InlineCode> or <InlineCode>{ORIGINS[1]}/api/</InlineCode>. Both serve the
+          same data, so pick the one you trust to stay around longer:
         </p>
+        <ul className="mb-4 list-disc space-y-1 pl-6 text-stone-600 dark:text-stone-400">
+          <li>
+            <InlineCode>region.ahsana.id</InlineCode> is the project's own domain. It stays up as long as the
+            project is maintained, and can keep working even if the hosting moves away from Cloudflare.
+          </li>
+          <li>
+            <InlineCode>region-indonesia.pages.dev</InlineCode> is provided by Cloudflare Pages. It stays up as long as
+            Cloudflare keeps supporting it, independent of the custom domain.
+          </li>
+        </ul>
         <Table
           head={["Endpoint", "Returns", "Example"]}
           rows={ENDPOINTS.map(({ path, returns, example }) => [
