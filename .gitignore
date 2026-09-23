@@ -5,3 +5,10 @@
 # React Router
 /.react-router/
 /build/
+
+# Generated API data
+/data/
+/public/api/
+
+# Wrangler
+/.wrangler/

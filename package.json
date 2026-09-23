@@ -3,10 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "generate:api": "node scripts/generate-api.mjs",
+    "prebuild": "npm run generate:api",
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "preview": "wrangler pages dev",
+    "deploy": "npm run build && wrangler pages deploy"
   },
   "dependencies": {
     "@react-router/node": "^8.4.0",
@@ -24,6 +28,7 @@
     "@types/react-dom": "^19.2.7",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "wrangler": "^4.136.3"
   }
 }

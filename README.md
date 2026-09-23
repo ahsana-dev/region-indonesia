@@ -1,87 +1,101 @@
-# Welcome to React Router!
+# Indonesia Region API
 
-A modern, production-ready template for building full-stack React applications using React Router.
+A static JSON API of Indonesia's administrative regions (provinces, regencies/cities, districts and villages), hosted on Cloudflare Pages. It needs no API key, has no server code, and any website can call it (CORS enabled).
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+| Level | Count |
+| --- | ---: |
+| Provinces | 38 |
+| Regencies / cities | 514 |
+| Districts | 7,285 |
+| Villages | 83,762 |
 
-## Features
+Interactive docs are served at the site root (`/`); `/api` and `/api/` redirect there.
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+## Endpoints
 
-## Getting Started
+All endpoints are `GET` requests for static files.
 
-### Installation
+| Endpoint | Returns | Example |
+| --- | --- | --- |
+| `/api/provinces.json` | All provinces | `/api/provinces.json` |
+| `/api/regencies/{provinceCode}.json` | Regencies and cities in a province | `/api/regencies/11.json` |
+| `/api/districts/{regencyCode}.json` | Districts in a regency or city | `/api/districts/11.01.json` |
+| `/api/villages/{districtCode}.json` | Villages in a district | `/api/villages/11.01.01.json` |
 
-Install the dependencies:
+A code that does not exist returns HTTP `404`.
+
+### Response format
+
+Every endpoint returns a JSON array of `{ code, name }` objects, sorted by code:
+
+```json
+[
+  { "code": "11.01", "name": "Kabupaten Aceh Selatan" },
+  { "code": "11.02", "name": "Kabupaten Aceh Tenggara" }
+]
+```
+
+### Region codes
+
+Codes follow the official Kemendagri format. Each level adds a dot-separated segment to its parent's code:
+
+| Level | Format | Example |
+| --- | --- | --- |
+| Province | `PP` | `11` Aceh |
+| Regency / city | `PP.RR` | `11.01` Kabupaten Aceh Selatan |
+| District | `PP.RR.DD` | `11.01.01` Bakongan |
+| Village | `PP.RR.DD.VVVV` | `11.01.01.2001` Keude Bakongan |
+
+### Example
+
+```js
+const BASE = "https://your-site.pages.dev/api";
+
+async function getRegions(path) {
+  const res = await fetch(`${BASE}/${path}.json`);
+  if (!res.ok) throw new Error(`Region not found: ${path}`);
+  return res.json();
+}
+
+const provinces = await getRegions("provinces");
+const regencies = await getRegions(`regencies/${provinces[0].code}`);
+```
+
+## Development
+
+Requires Node.js 22 or later.
 
 ```bash
 npm install
+npm run generate:api   # build public/api/ from the source SQL
+npm run build          # generate the API, then build the site into build/client/
+npm run preview        # serve build/client/ locally as Cloudflare Pages would
+npm run deploy         # build and deploy to Cloudflare Pages
 ```
 
-### Development
+`npm run generate:api` reads `data/wilayah.sql`, downloading it from the source repository if it is missing. To use a different copy, pass its path: `node scripts/generate-api.mjs path/to/wilayah.sql`. To pick up new upstream data, delete `data/wilayah.sql` and rebuild.
 
-Start the development server with HMR:
+The generator also:
 
-```bash
-npm run dev
-```
+- stops with an error on duplicate codes, unexpected code formats, or regions whose parent is missing
+- writes a `404.html` for missing `/api/*` paths
+- stops with an error if the output exceeds Cloudflare Pages limits: 20,000 files (set `PAGES_FILE_LIMIT=100000` on paid plans) or 25 MiB per file
 
-Your application will be available at `http://localhost:5173`.
+`public/api/` and `data/` are generated, so they are not committed.
 
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
+The docs page is the React Router route `app/routes/home.tsx`. It is prerendered to `build/client/index.html` at build time (`prerender: ["/"]` with `ssr: false`), and its record counts come from the generated files in `public/api/`.
 
 ## Deployment
 
-### Docker Deployment
+This is a static **Cloudflare Pages** site, not a Worker. `wrangler.jsonc` sets `pages_build_output_dir`; do not add a `main` entry, a `functions/` directory or a `_worker.js`.
 
-To build and run using Docker:
+To deploy from Git in the Cloudflare dashboard, create a **Pages** project with:
 
-```bash
-docker build -t my-app .
+- Build command: `npm run build`
+- Build output directory: `build/client`
 
-# Run the container
-docker run -p 3000:3000 my-app
-```
+CORS headers for `/api/*` are set in `public/_headers`, and the `/api` → `/` redirects in `public/_redirects`.
 
-The containerized application can be deployed to any platform that supports Docker, including:
+## Credits
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+The region data comes from [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah) by cahya dsn, released under the [MIT License](https://github.com/cahyadsn/wilayah/blob/master/LICENSE) and based on Kepmendagri No 300.2.2-2430 Tahun 2025. Many thanks to the author for compiling and maintaining this data.
