@@ -22,6 +22,7 @@ export async function loader() {
 }
 
 const PLACEHOLDER_ORIGIN = "https://your-site.pages.dev";
+const REPO_URL = "https://github.com/ahsana-dev/region-indonesia";
 
 const ENDPOINTS = [
   { path: "/api/provinces.json", returns: "All provinces", example: "/api/provinces.json" },
@@ -124,6 +125,13 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
         <p className="text-lg">
           A free, static JSON API of Indonesia's administrative regions: provinces, regencies/cities, districts and
           villages. No API key, no rate limits, and any website can call it (CORS enabled).
+        </p>
+        <p className="mt-2">
+          Source code:{" "}
+          <a href={REPO_URL} className="text-red-700 underline dark:text-red-400">
+            ahsana-dev/region-indonesia
+          </a>{" "}
+          on GitHub.
         </p>
         <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
           {stats.map(({ value, label }) => (
@@ -231,7 +239,13 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
           ), based on Kepmendagri No 300.2.2-2430 Tahun 2025. Many thanks to the author for compiling and maintaining
           this data.
         </p>
-        <p className="mt-2">Generated {generated}.</p>
+        <p className="mt-2">
+          Generated {generated}. Source on{" "}
+          <a href={REPO_URL} className="text-red-700 underline dark:text-red-400">
+            GitHub
+          </a>
+          .
+        </p>
       </footer>
     </main>
   );
