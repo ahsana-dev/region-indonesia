@@ -42,6 +42,10 @@ const RESPONSE_EXAMPLE = `[
   { "code": "11.02", "name": "Kabupaten Aceh Tenggara" }
 ]`;
 
+// Keep in sync with public/_headers.
+const CORS_HEADERS = `Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, HEAD`;
+
 function InlineCode({ children }: { children: ReactNode }) {
   return (
     <code className="rounded border border-stone-200 bg-stone-100 px-1.5 py-px text-[0.9em] text-stone-900 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-100">
@@ -175,6 +179,31 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
           A code that does not exist returns HTTP <InlineCode>404</InlineCode>. Always check{" "}
           <InlineCode>response.ok</InlineCode> before parsing the body.
         </p>
+      </Section>
+
+      <Section id="cors" title="Calling from the browser (CORS)">
+        <p>
+          Every <InlineCode>/api/*</InlineCode> response includes these headers, so JavaScript on any website can call
+          the API directly with <InlineCode>fetch</InlineCode>: from your own domain, another domain, or{" "}
+          <InlineCode>localhost</InlineCode> during development. No proxy or backend is needed.
+        </p>
+        <CodeBlock code={CORS_HEADERS} />
+        <p className="mb-2">To keep requests working from the browser:</p>
+        <ul className="list-disc space-y-1 pl-6 text-stone-600 dark:text-stone-400">
+          <li>
+            Use a plain <InlineCode>GET</InlineCode> request, like <InlineCode>fetch(url)</InlineCode>. Only{" "}
+            <InlineCode>GET</InlineCode> and <InlineCode>HEAD</InlineCode> are supported.
+          </li>
+          <li>
+            Don't add custom request headers (such as <InlineCode>Authorization</InlineCode> or{" "}
+            <InlineCode>Content-Type</InlineCode>). They make the browser send an <InlineCode>OPTIONS</InlineCode>{" "}
+            preflight request first, which a static site cannot answer, so the request fails.
+          </li>
+          <li>
+            Don't set <InlineCode>credentials: "include"</InlineCode>. Browsers reject a wildcard{" "}
+            <InlineCode>*</InlineCode> origin for credentialed requests, and the API needs no cookies or keys anyway.
+          </li>
+        </ul>
       </Section>
 
       <Section id="examples" title="Examples">

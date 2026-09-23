@@ -46,6 +46,21 @@ Codes follow the official Kemendagri format. Each level adds a dot-separated seg
 | District | `PP.RR.DD` | `11.01.01` Bakongan |
 | Village | `PP.RR.DD.VVVV` | `11.01.01.2001` Keude Bakongan |
 
+### Calling from the browser (CORS)
+
+Every `/api/*` response includes these headers (set in `public/_headers`), so JavaScript on any website can call the API directly with `fetch`: from your own domain, another domain, or `localhost` during development. No proxy or backend is needed.
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, HEAD
+```
+
+To keep requests working from the browser:
+
+- Use a plain `GET` request, like `fetch(url)`. Only `GET` and `HEAD` are supported.
+- Don't add custom request headers (such as `Authorization` or `Content-Type`). They make the browser send an `OPTIONS` preflight request first, which a static site cannot answer (it returns `405`), so the request fails.
+- Don't set `credentials: "include"`. Browsers reject a wildcard `*` origin for credentialed requests, and the API needs no cookies or keys anyway.
+
 ### Example
 
 ```js
