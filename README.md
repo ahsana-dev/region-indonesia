@@ -9,7 +9,12 @@ A static JSON API of Indonesia's administrative regions (provinces, regencies/ci
 | Districts | 7,285 |
 | Villages | 83,762 |
 
-Interactive docs are served at the site root (`/`); `/api` and `/api/` redirect there.
+## Live
+
+- https://region.ahsana.id
+- https://region-indonesia.pages.dev
+
+Interactive docs are served at the site root (`/`); `/api` and `/api/` redirect there. Try it: [`https://region.ahsana.id/api/provinces.json`](https://region.ahsana.id/api/provinces.json).
 
 ## Endpoints
 
@@ -64,7 +69,7 @@ To keep requests working from the browser:
 ### Example
 
 ```js
-const BASE = "https://your-site.pages.dev/api";
+const BASE = "https://region.ahsana.id/api";
 
 async function getRegions(path) {
   const res = await fetch(`${BASE}/${path}.json`);
@@ -114,3 +119,7 @@ CORS headers for `/api/*` are set in `public/_headers`, and the `/api` → `/` r
 ## Credits
 
 The region data comes from [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah) by cahya dsn, released under the [MIT License](https://github.com/cahyadsn/wilayah/blob/master/LICENSE) and based on Kepmendagri No 300.2.2-2430 Tahun 2025. Many thanks to the author for compiling and maintaining this data.
+
+---
+
+Built with ❤️ using React Router.
