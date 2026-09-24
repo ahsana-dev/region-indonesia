@@ -1,23 +1,28 @@
-// Generates the static JSON API from cahyadsn/wilayah's db/wilayah.sql.
+// Generates the static JSON API from cahyadsn/wilayah's db/wilayah.sql, plus
+// province and regency boundaries from db/wilayah_level_1_2.sql.
 //
 // Output (under public/api/):
-//   provinces.json                    all provinces
-//   regencies/{provinceCode}.json     regencies/cities in a province
-//   districts/{regencyCode}.json      districts in a regency/city
-//   villages/{districtCode}.json      villages in a district
-//   404.html                          returned for missing /api/* paths
+//   provinces.json                          all provinces
+//   regencies/{provinceCode}.json           regencies/cities in a province
+//   districts/{regencyCode}.json            districts in a regency/city
+//   villages/{districtCode}.json            villages in a district
+//   geojson/provinces.json                  province boundaries (FeatureCollection)
+//   geojson/regencies/{provinceCode}.json   regency/city boundaries in a province
+//   404.html                                returned for missing /api/* paths
 //
-// Usage: node scripts/generate-api.mjs [path/to/wilayah.sql]
-// If the SQL file is missing, it is downloaded from GitHub first.
+// Usage: node scripts/generate-api.mjs [path/to/wilayah.sql] [path/to/wilayah_level_1_2.sql]
+// If an SQL file is missing, it is downloaded from GitHub first.
 
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const SOURCE_URL =
-  "https://raw.githubusercontent.com/cahyadsn/wilayah/master/db/wilayah.sql";
+const SOURCE_BASE = "https://raw.githubusercontent.com/cahyadsn/wilayah/master/db";
 const SQL_PATH = path.resolve(process.argv[2] ?? path.join(ROOT, "data/wilayah.sql"));
+const BOUNDARY_SQL_PATH = path.resolve(
+  process.argv[3] ?? path.join(ROOT, "data/wilayah_level_1_2.sql"),
+);
 const OUT_DIR = path.join(ROOT, "public/api");
 
 // Code segments per level: 11 / 11.01 / 11.01.01 / 11.01.01.2001
@@ -37,15 +42,19 @@ const NOT_FOUND_HTML = `<!doctype html>
 </html>
 `;
 
-async function loadSql() {
-  if (!existsSync(SQL_PATH)) {
-    console.log(`Downloading ${SOURCE_URL}`);
-    const res = await fetch(SOURCE_URL);
+// Boundary coordinates are rounded to 6 decimals (~0.1 m) to keep files small.
+const COORD_PRECISION = 1e6;
+
+async function loadSql(file) {
+  if (!existsSync(file)) {
+    const url = `${SOURCE_BASE}/${path.basename(file)}`;
+    console.log(`Downloading ${url}`);
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
-    await mkdir(path.dirname(SQL_PATH), { recursive: true });
-    await writeFile(SQL_PATH, await res.text());
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, await res.text());
   }
-  return readFile(SQL_PATH, "utf8");
+  return readFile(file, "utf8");
 }
 
 // Matches ('kode','nama') tuples; SQL escapes a quote inside a string as ''.
@@ -56,6 +65,86 @@ function parseRows(sql) {
     rows.push({ code, name: name.replaceAll("''", "'").trim() });
   }
   return rows;
+}
+
+// Matches ('kode','nama','ibukota', lat, lng, elv, tz, luas, penduduk, 'path', status)
+// rows and returns each region's `path`: a JSON array of [lat, lng] rings.
+function parseBoundaries(sql) {
+  const re =
+    /\('([0-9.]+)','(?:[^']|'')*',\s*(?:NULL|'(?:[^']|'')*'),(?:\s*[^,]+,){6}\s*(?:NULL|'([^']*)')/g;
+  const boundaries = new Map();
+  for (const [, code, rawPath] of sql.matchAll(re)) {
+    if (!rawPath) continue;
+    let value;
+    try {
+      value = JSON.parse(rawPath);
+    } catch {
+      // Upstream has at least one path (32.79) missing its closing bracket.
+      value = JSON.parse(`${rawPath}]`);
+    }
+    boundaries.set(code, toGeometry(code, value));
+  }
+  return boundaries;
+}
+
+const isPoint = (value) => typeof value[0] === "number";
+
+// Upstream nests rings inconsistently ([ring], [[ring]], [[[ring]]]) and
+// sometimes leaves a ring's points loose in its parent array, so every
+// consecutive run of points is collected as one ring.
+function collectRings(value, rings = []) {
+  let loose = [];
+  for (const item of value) {
+    if (!Array.isArray(item) || item.length === 0) continue;
+    if (isPoint(item)) {
+      loose.push(item);
+      continue;
+    }
+    if (loose.length) rings.push(loose), (loose = []);
+    if (isPoint(item[0])) rings.push(item);
+    else collectRings(item, rings);
+  }
+  if (loose.length) rings.push(loose);
+  return rings;
+}
+
+// [lat, lng] ring -> closed GeoJSON [lng, lat] ring, or null if degenerate.
+function toLinearRing(ring) {
+  const round = (n) => Math.round(n * COORD_PRECISION) / COORD_PRECISION;
+  const coords = [];
+  for (const [lat, lng] of ring) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const point = [round(lng), round(lat)];
+    const prev = coords.at(-1);
+    if (!prev || prev[0] !== point[0] || prev[1] !== point[1]) coords.push(point);
+  }
+  const [first, last] = [coords[0], coords.at(-1)];
+  if (coords.length && (first[0] !== last[0] || first[1] !== last[1])) coords.push(first);
+  return coords.length >= 4 ? coords : null;
+}
+
+// Upstream does not distinguish holes from islands, and rings lying inside
+// another ring are nearly all islets, so every ring becomes its own polygon.
+function toGeometry(code, value) {
+  const polygons = collectRings(value)
+    .map(toLinearRing)
+    .filter(Boolean)
+    .map((ring) => [ring]);
+  if (polygons.length === 0) throw new Error(`No usable boundary rings for ${code}`);
+  return polygons.length === 1
+    ? { type: "Polygon", coordinates: polygons[0] }
+    : { type: "MultiPolygon", coordinates: polygons };
+}
+
+function toFeatureCollection(regions, boundaries) {
+  return {
+    type: "FeatureCollection",
+    features: regions.map(({ code, name }) => {
+      const geometry = boundaries.get(code);
+      if (!geometry) throw new Error(`Missing boundary for ${code} ${name}`);
+      return { type: "Feature", id: code, properties: { code, name }, geometry };
+    }),
+  };
 }
 
 function groupByParent(rows) {
@@ -121,9 +210,12 @@ async function checkPagesLimits() {
 }
 
 async function main() {
-  const rows = parseRows(await loadSql());
+  const rows = parseRows(await loadSql(SQL_PATH));
   if (rows.length === 0) throw new Error(`No rows parsed from ${SQL_PATH}`);
   const byLevel = groupByParent(rows);
+
+  const boundaries = parseBoundaries(await loadSql(BOUNDARY_SQL_PATH));
+  if (boundaries.size === 0) throw new Error(`No boundaries parsed from ${BOUNDARY_SQL_PATH}`);
 
   await rm(OUT_DIR, { recursive: true, force: true });
 
@@ -137,12 +229,21 @@ async function main() {
     }
   }
 
+  const geojsonDir = path.join(OUT_DIR, "geojson");
+  await writeJson(path.join(geojsonDir, "provinces.json"), toFeatureCollection(provinces, boundaries));
+  for (const [parent, regencies] of byLevel.regency) {
+    await writeJson(
+      path.join(geojsonDir, "regencies", `${parent}.json`),
+      toFeatureCollection(regencies, boundaries),
+    );
+  }
+
   await writeFile(path.join(OUT_DIR, "404.html"), NOT_FOUND_HTML);
 
   const count = (level) => [...byLevel[level].values()].reduce((n, list) => n + list.length, 0);
   console.log(
     `provinces=${provinces.length} regencies=${count("regency")} ` +
-      `districts=${count("district")} villages=${count("village")}`,
+      `districts=${count("district")} villages=${count("village")} boundaries=${boundaries.size}`,
   );
 
   await checkPagesLimits();

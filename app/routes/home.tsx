@@ -30,6 +30,8 @@ const ENDPOINTS = [
   { path: "/api/regencies/{provinceCode}.json", returns: "Regencies and cities in a province", example: "/api/regencies/11.json" },
   { path: "/api/districts/{regencyCode}.json", returns: "Districts in a regency or city", example: "/api/districts/11.01.json" },
   { path: "/api/villages/{districtCode}.json", returns: "Villages in a district", example: "/api/villages/11.01.01.json" },
+  { path: "/api/geojson/provinces.json", returns: "Boundaries of all provinces (GeoJSON)", example: "/api/geojson/provinces.json" },
+  { path: "/api/geojson/regencies/{provinceCode}.json", returns: "Boundaries of regencies and cities in a province (GeoJSON)", example: "/api/geojson/regencies/11.json" },
 ];
 
 const CODE_LEVELS = [
@@ -43,6 +45,18 @@ const RESPONSE_EXAMPLE = `[
   { "code": "11.01", "name": "Kabupaten Aceh Selatan" },
   { "code": "11.02", "name": "Kabupaten Aceh Tenggara" }
 ]`;
+
+const GEOJSON_EXAMPLE = `{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "11.01",
+      "properties": { "code": "11.01", "name": "Kabupaten Aceh Selatan" },
+      "geometry": { "type": "MultiPolygon", "coordinates": [[[[97.047623, 3.47154], …]]] }
+    }
+  ]
+}`;
 
 // Keep in sync with public/_headers.
 const CORS_HEADERS = `Access-Control-Allow-Origin: *
@@ -170,9 +184,22 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
 
       <Section id="response-format" title="Response format">
         <p>
-          Every endpoint returns a JSON array of <InlineCode>{"{ code, name }"}</InlineCode> objects, sorted by code.
+          Every region endpoint returns a JSON array of <InlineCode>{"{ code, name }"}</InlineCode> objects, sorted
+          by code.
         </p>
         <CodeBlock code={RESPONSE_EXAMPLE} />
+
+        <h3 className="mt-6 mb-2 font-semibold">Boundaries (GeoJSON)</h3>
+        <p className="mb-3">
+          The <InlineCode>/api/geojson/*</InlineCode> endpoints return a GeoJSON{" "}
+          <InlineCode>FeatureCollection</InlineCode> with one feature per region, in the same order as the matching
+          region endpoint. Each feature has the region code as its <InlineCode>id</InlineCode>,{" "}
+          <InlineCode>{"{ code, name }"}</InlineCode> as its properties, and a <InlineCode>Polygon</InlineCode> or{" "}
+          <InlineCode>MultiPolygon</InlineCode> geometry with <InlineCode>[longitude, latitude]</InlineCode>{" "}
+          coordinates (WGS 84). Boundaries are available for provinces and regencies/cities only. They are meant
+          for display on a map, not for precise spatial analysis. All provinces together are about 2.3 MB.
+        </p>
+        <CodeBlock code={GEOJSON_EXAMPLE} />
 
         <h3 className="mt-6 mb-2 font-semibold">Region codes</h3>
         <p className="mb-3">
@@ -244,7 +271,11 @@ const regencies = await getRegions(\`regencies/\${provinces[0].code}\`);`;
           <a href="https://github.com/cahyadsn/wilayah/blob/master/LICENSE" className="text-red-700 underline dark:text-red-400">
             MIT License
           </a>
-          ), based on Kepmendagri No 300.2.2-2430 Tahun 2025. Many thanks to the author for compiling and maintaining
+          ), based on Kepmendagri No 300.2.2-2430 Tahun 2025. Boundaries come from the same repository's{" "}
+          <a href="https://github.com/cahyadsn/wilayah/blob/master/db/wilayah_level_1_2.sql" className="text-red-700 underline dark:text-red-400">
+            wilayah_level_1_2.sql
+          </a>
+          . Many thanks to the author for compiling and maintaining
           this data.
         </p>
         <p className="mt-2">
